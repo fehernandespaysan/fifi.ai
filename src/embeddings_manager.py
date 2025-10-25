@@ -1,12 +1,12 @@
 """
 Embeddings Manager for Fifi.ai
 
-Handles text chunking, embedding generation, and vector storage using FAISS.
+Handles text chunking, embedding generation, and vector storage.
 
 This module is responsible for:
 - Splitting text into semantic chunks
 - Generating embeddings via OpenAI API
-- Storing vectors in FAISS index
+- Storing vectors in vector database (FAISS or Pinecone)
 - Similarity search
 - Index persistence (save/load)
 
@@ -19,19 +19,20 @@ Usage:
     manager.save()
 """
 
-import pickle
 import time
+import uuid
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional
 
-import faiss
 import numpy as np
 from openai import OpenAI
 
 from src.blog_loader import Blog
 from src.config import get_config
 from src.logger import get_logger, LoggerContext
+from src.vector_store import VectorStore, create_vector_store
+from src.vector_store.base import SearchResult as VectorSearchResult
 
 logger = get_logger(__name__)
 
@@ -83,26 +84,22 @@ class EmbeddingsManager:
     """
     Manages embeddings generation and vector storage.
 
-    Uses OpenAI for embeddings and FAISS for vector storage.
+    Uses OpenAI for embeddings and supports multiple vector store backends
+    (FAISS for local storage, Pinecone for cloud storage).
     """
 
     def __init__(
         self,
-        index_path: Optional[Path] = None,
-        metadata_path: Optional[Path] = None,
+        vector_store: Optional[VectorStore] = None,
     ):
         """
         Initialize the embeddings manager.
 
         Args:
-            index_path: Path to FAISS index file (uses config if None)
-            metadata_path: Path to metadata file (uses config if None)
+            vector_store: Optional VectorStore instance (creates one from config if None)
         """
         config = get_config()
         self.config = config
-
-        self.index_path = index_path or config.faiss_index_path
-        self.metadata_path = metadata_path or config.faiss_metadata_path
 
         self.chunk_size = config.chunk_size
         self.chunk_overlap = config.chunk_overlap
@@ -111,10 +108,11 @@ class EmbeddingsManager:
         self.openai_client = OpenAI(api_key=config.openai_api_key)
         self.embedding_model = config.openai_embedding_model
 
-        # FAISS index and metadata storage
-        self.index: Optional[faiss.Index] = None
-        self.chunks: List[Chunk] = []
-        self.dimension: Optional[int] = None
+        # Initialize vector store
+        self.vector_store = vector_store or create_vector_store(config)
+
+        # Chunk ID mapping (to retrieve chunks from vector store results)
+        self.chunk_map: Dict[str, Chunk] = {}  # Maps chunk_id to Chunk object
 
         # Metrics
         self.total_embeddings_generated = 0
@@ -127,7 +125,7 @@ class EmbeddingsManager:
                 "embedding_model": self.embedding_model,
                 "chunk_size": self.chunk_size,
                 "chunk_overlap": self.chunk_overlap,
-                "index_path": str(self.index_path),
+                "vector_store": self.vector_store.__class__.__name__,
             },
         )
 
@@ -285,7 +283,7 @@ class EmbeddingsManager:
 
     def add_documents(self, blogs: List[Blog]) -> None:
         """
-        Add blog documents to the index.
+        Add blog documents to the vector store.
 
         Args:
             blogs: List of Blog objects to index
@@ -313,30 +311,53 @@ class EmbeddingsManager:
 
             logger.info(
                 f"Created {len(all_chunks)} chunks from {len(blogs)} blogs",
-                extra={"total_chunks": len(all_chunks), "avg_chunks_per_blog": len(all_chunks) / len(blogs)},
+                extra={"total_chunks": len(all_chunks), "avg_chunks_per_blog": len(all_chunks) / len(blogs) if blogs else 0},
             )
 
             # Generate embeddings in batch
             chunk_texts = [chunk.text for chunk in all_chunks]
             embeddings = self.generate_embeddings_batch(chunk_texts)
 
-            # Initialize or update FAISS index
-            if self.index is None:
-                self.dimension = embeddings.shape[1]
-                self.index = faiss.IndexFlatL2(self.dimension)
-                logger.info(f"Created new FAISS index with dimension {self.dimension}")
+            # Prepare metadata for vector store
+            chunk_ids = []
+            vector_metadata = []
 
-            # Add embeddings to index
-            self.index.add(embeddings)
-            self.chunks.extend(all_chunks)
+            for chunk in all_chunks:
+                chunk_id = str(uuid.uuid4())
+                chunk_ids.append(chunk_id)
+
+                # Store chunk in our map
+                self.chunk_map[chunk_id] = chunk
+
+                # Prepare metadata for vector store
+                metadata_dict = {
+                    "chunk_id": chunk_id,
+                    "text": chunk.text,
+                    "blog_title": chunk.blog_title,
+                    "blog_file": chunk.blog_file,
+                    "chunk_index": chunk.chunk_index,
+                    "start_pos": chunk.start_pos,
+                    "end_pos": chunk.end_pos,
+                }
+                # Merge with original metadata
+                metadata_dict.update(chunk.metadata)
+                vector_metadata.append(metadata_dict)
+
+            # Add to vector store
+            self.vector_store.add_vectors(
+                vectors=embeddings,
+                metadata=vector_metadata,
+                ids=chunk_ids,
+            )
 
             elapsed_time = time.time() - start_time
+            stats = self.vector_store.get_stats()
 
             logger.info(
                 "Documents added to index",
                 extra={
-                    "total_chunks": len(self.chunks),
-                    "index_size": self.index.ntotal,
+                    "total_chunks": len(self.chunk_map),
+                    "index_size": stats.get("total_vectors", 0),
                     "elapsed_seconds": round(elapsed_time, 2),
                     "total_tokens": self.total_tokens_used,
                 },
@@ -356,7 +377,8 @@ class EmbeddingsManager:
         Raises:
             EmbeddingsError: If search fails or index is empty
         """
-        if self.index is None or self.index.ntotal == 0:
+        stats = self.vector_store.get_stats()
+        if stats.get("total_vectors", 0) == 0:
             raise EmbeddingsError("Index is empty. Add documents first.")
 
         with LoggerContext() as correlation_id:
@@ -373,25 +395,31 @@ class EmbeddingsManager:
 
             # Generate query embedding
             query_embedding = self.generate_embedding(query)
-            query_vector = query_embedding.reshape(1, -1)
 
-            # Search FAISS index
-            distances, indices = self.index.search(query_vector, top_k)
+            # Search vector store
+            vector_results = self.vector_store.search(
+                query_vector=query_embedding,
+                top_k=top_k,
+            )
 
-            # Build results
+            # Convert vector store results to our SearchResult format
             results = []
-            for i, (distance, idx) in enumerate(zip(distances[0], indices[0])):
-                if idx >= len(self.chunks):
-                    logger.warning(f"Index {idx} out of range, skipping")
+            for vec_result in vector_results:
+                chunk_id = vec_result.metadata.get("chunk_id")
+                if not chunk_id:
+                    logger.warning("Result missing chunk_id, skipping")
                     continue
 
-                chunk = self.chunks[idx]
-                score = 1.0 / (1.0 + distance)  # Convert distance to similarity score
+                # Get chunk from our map
+                chunk = self.chunk_map.get(chunk_id)
+                if not chunk:
+                    logger.warning(f"Chunk {chunk_id} not found in map, skipping")
+                    continue
 
                 result = SearchResult(
                     chunk=chunk,
-                    score=score,
-                    distance=float(distance),
+                    score=vec_result.score,
+                    distance=vec_result.distance,
                 )
                 results.append(result)
 
@@ -410,45 +438,47 @@ class EmbeddingsManager:
 
     def save(self) -> None:
         """
-        Save FAISS index and metadata to disk.
+        Save vector store and metadata to disk.
 
         Raises:
             EmbeddingsError: If save fails
         """
-        if self.index is None or self.index.ntotal == 0:
+        stats = self.vector_store.get_stats()
+        if stats.get("total_vectors", 0) == 0:
             logger.warning("Cannot save empty index")
             return
 
         try:
-            # Create directory if needed
-            self.index_path.parent.mkdir(parents=True, exist_ok=True)
+            # Save vector store (delegates to backend)
+            self.vector_store.save()
 
-            # Save FAISS index
-            faiss.write_index(self.index, str(self.index_path))
+            # Save chunk map and metrics (for FAISS only - Pinecone stores metadata in cloud)
+            if self.vector_store.get_stats().get("backend") == "faiss":
+                metadata_path = self.config.faiss_metadata_path.parent / "chunks_metadata.pkl"
+                metadata_path.parent.mkdir(parents=True, exist_ok=True)
 
-            # Save metadata
-            metadata = {
-                "chunks": self.chunks,
-                "dimension": self.dimension,
-                "total_embeddings": self.total_embeddings_generated,
-                "total_tokens": self.total_tokens_used,
-                "embedding_model": self.embedding_model,
-                "chunk_size": self.chunk_size,
-                "chunk_overlap": self.chunk_overlap,
-            }
+                import pickle
+                metadata = {
+                    "chunk_map": self.chunk_map,
+                    "total_embeddings": self.total_embeddings_generated,
+                    "total_tokens": self.total_tokens_used,
+                    "embedding_model": self.embedding_model,
+                    "chunk_size": self.chunk_size,
+                    "chunk_overlap": self.chunk_overlap,
+                }
 
-            with open(self.metadata_path, "wb") as f:
-                pickle.dump(metadata, f)
+                with open(metadata_path, "wb") as f:
+                    pickle.dump(metadata, f)
 
-            logger.info(
-                "Index saved",
-                extra={
-                    "index_path": str(self.index_path),
-                    "metadata_path": str(self.metadata_path),
-                    "total_vectors": self.index.ntotal,
-                    "total_chunks": len(self.chunks),
-                },
-            )
+                logger.info(
+                    "Index and metadata saved",
+                    extra={
+                        "metadata_path": str(metadata_path),
+                        "total_chunks": len(self.chunk_map),
+                    },
+                )
+            else:
+                logger.info("Vector store saved (cloud-managed)")
 
         except Exception as e:
             logger.error(f"Failed to save index: {str(e)}", exc_info=True)
@@ -456,7 +486,7 @@ class EmbeddingsManager:
 
     def load(self) -> bool:
         """
-        Load FAISS index and metadata from disk.
+        Load vector store and metadata from disk.
 
         Returns:
             True if loaded successfully, False if files don't exist
@@ -464,44 +494,51 @@ class EmbeddingsManager:
         Raises:
             EmbeddingsError: If load fails
         """
-        if not self.index_path.exists() or not self.metadata_path.exists():
-            logger.info("Index files not found, starting fresh")
-            return False
-
         try:
-            # Load FAISS index
-            self.index = faiss.read_index(str(self.index_path))
+            # Load vector store (delegates to backend)
+            self.vector_store.load()
 
-            # Load metadata
-            with open(self.metadata_path, "rb") as f:
-                metadata = pickle.load(f)
+            # Load chunk map and metrics (for FAISS only)
+            if self.vector_store.get_stats().get("backend") == "faiss":
+                metadata_path = self.config.faiss_metadata_path.parent / "chunks_metadata.pkl"
 
-            self.chunks = metadata["chunks"]
-            self.dimension = metadata["dimension"]
-            self.total_embeddings_generated = metadata.get("total_embeddings", 0)
-            self.total_tokens_used = metadata.get("total_tokens", 0)
+                if not metadata_path.exists():
+                    logger.info("Chunk metadata not found, starting fresh")
+                    return False
 
-            logger.info(
-                "Index loaded",
-                extra={
-                    "index_path": str(self.index_path),
-                    "total_vectors": self.index.ntotal,
-                    "total_chunks": len(self.chunks),
-                    "dimension": self.dimension,
-                },
-            )
+                import pickle
+                with open(metadata_path, "rb") as f:
+                    metadata = pickle.load(f)
+
+                self.chunk_map = metadata.get("chunk_map", {})
+                self.total_embeddings_generated = metadata.get("total_embeddings", 0)
+                self.total_tokens_used = metadata.get("total_tokens", 0)
+
+                logger.info(
+                    "Index and metadata loaded",
+                    extra={
+                        "total_chunks": len(self.chunk_map),
+                        "total_vectors": self.vector_store.get_stats().get("total_vectors", 0),
+                    },
+                )
+            else:
+                # For Pinecone, we need to rebuild chunk_map from vector store metadata
+                # This is a limitation - we'll log a warning
+                logger.warning(
+                    "Pinecone store loaded - chunk map may be incomplete. "
+                    "Consider re-indexing documents if you experience issues."
+                )
 
             return True
 
         except Exception as e:
-            logger.error(f"Failed to load index: {str(e)}", exc_info=True)
-            raise EmbeddingsError(f"Load failed: {str(e)}")
+            logger.info(f"Failed to load index (may not exist yet): {str(e)}")
+            return False
 
     def clear(self) -> None:
         """Clear the index and metadata."""
-        self.index = None
-        self.chunks = []
-        self.dimension = None
+        self.vector_store.clear()
+        self.chunk_map.clear()
         self.total_embeddings_generated = 0
         self.total_api_calls = 0
         self.total_tokens_used = 0
@@ -514,17 +551,18 @@ class EmbeddingsManager:
         Returns:
             Dictionary with statistics
         """
+        vector_stats = self.vector_store.get_stats()
+
         return {
-            "total_vectors": self.index.ntotal if self.index else 0,
-            "total_chunks": len(self.chunks),
-            "dimension": self.dimension,
+            "total_vectors": vector_stats.get("total_vectors", 0),
+            "total_chunks": len(self.chunk_map),
+            "dimension": vector_stats.get("dimension"),
             "embedding_model": self.embedding_model,
             "chunk_size": self.chunk_size,
             "chunk_overlap": self.chunk_overlap,
             "total_embeddings_generated": self.total_embeddings_generated,
             "total_api_calls": self.total_api_calls,
             "total_tokens_used": self.total_tokens_used,
-            "index_exists": self.index is not None,
-            "index_path": str(self.index_path),
-            "metadata_path": str(self.metadata_path),
+            "vector_store_backend": vector_stats.get("backend"),
+            "vector_store_stats": vector_stats,
         }

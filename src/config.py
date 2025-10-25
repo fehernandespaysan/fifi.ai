@@ -45,6 +45,13 @@ class LogFormat(str, Enum):
     TEXT = "text"
 
 
+class VectorStoreType(str, Enum):
+    """Vector store backend options."""
+
+    FAISS = "faiss"
+    PINECONE = "pinecone"
+
+
 class Config(BaseSettings):
     """
     Application configuration loaded from environment variables.
@@ -151,6 +158,12 @@ class Config(BaseSettings):
     # =============================================================================
     # Vector Database Configuration
     # =============================================================================
+    vector_store_type: VectorStoreType = Field(
+        default=VectorStoreType.FAISS,
+        description="Vector store backend (faiss or pinecone)"
+    )
+
+    # FAISS Configuration
     faiss_index_path: Path = Field(
         default=Path("data/faiss_index.faiss"),
         description="Path to FAISS index file"
@@ -159,6 +172,22 @@ class Config(BaseSettings):
         default=Path("data/faiss_metadata.pkl"),
         description="Path to FAISS metadata file"
     )
+
+    # Pinecone Configuration
+    pinecone_api_key: Optional[str] = Field(
+        default=None,
+        description="Pinecone API key (required if using Pinecone)"
+    )
+    pinecone_environment: str = Field(
+        default="us-west1-gcp-free",
+        description="Pinecone environment/region"
+    )
+    pinecone_index_name: str = Field(
+        default="fifi-ai-blog-index",
+        description="Pinecone index name"
+    )
+
+    # Vector Search Settings
     vector_search_top_k: int = Field(
         default=5,
         ge=1,
@@ -203,6 +232,7 @@ class Config(BaseSettings):
     # =============================================================================
     # Blog Content Configuration
     # =============================================================================
+    # Local Blog Files
     blogs_directory: Path = Field(
         default=Path("blogs/"),
         description="Directory containing blog markdown files"
@@ -210,6 +240,26 @@ class Config(BaseSettings):
     blog_extensions: str | List[str] = Field(
         default=[".md", ".markdown"],
         description="Supported blog file extensions"
+    )
+
+    # Blog Feed Configuration (RSS/Atom)
+    blog_feed_url: Optional[str] = Field(
+        default=None,
+        description="URL of blog RSS/Atom feed"
+    )
+    feed_fetch_enabled: bool = Field(
+        default=False,
+        description="Enable fetching blogs from RSS/Atom feed"
+    )
+    feed_refresh_interval_hours: int = Field(
+        default=24,
+        ge=1,
+        le=168,  # Max 1 week
+        description="How often to check feed for new posts (in hours)"
+    )
+    feed_cache_dir: Path = Field(
+        default=Path("data/feed_cache"),
+        description="Directory to cache feed data"
     )
 
     # =============================================================================
@@ -246,6 +296,30 @@ class Config(BaseSettings):
         default=100,
         ge=1,
         description="Maximum requests per day per user"
+    )
+
+    # =============================================================================
+    # Hybrid Search Configuration
+    # =============================================================================
+    hybrid_search_enabled: bool = Field(
+        default=False,
+        description="Enable hybrid (vector + keyword) search"
+    )
+    hybrid_vector_weight: float = Field(
+        default=0.7,
+        ge=0.0,
+        le=1.0,
+        description="Weight for vector similarity in hybrid search"
+    )
+    hybrid_keyword_weight: float = Field(
+        default=0.3,
+        ge=0.0,
+        le=1.0,
+        description="Weight for keyword/BM25 search in hybrid search"
+    )
+    bm25_index_path: Path = Field(
+        default=Path("data/bm25_index.pkl"),
+        description="Path to BM25 index file"
     )
 
     # =============================================================================
