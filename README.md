@@ -82,11 +82,11 @@ Visit `http://localhost:8501` - Your branded chatbot is live!
 
 ## 📖 Documentation
 
-- **[CUSTOMIZATION.md](CUSTOMIZATION.md)** - How to brand and customize
-- **[BLOG_FORMAT.md](BLOG_FORMAT.md)** - How to write blog posts
-- **[DEPLOYMENT.md](DEPLOYMENT.md)** - Deploy to Streamlit Cloud (free!)
-- **[ROADMAP.md](ROADMAP.md)** - Project roadmap and future plans
-- **[CLAUDE.md](CLAUDE.md)** - Development guide for contributors
+- **[CUSTOMIZATION.md](docs/CUSTOMIZATION.md)** - How to brand and customize
+- **[BLOG_FORMAT.md](docs/BLOG_FORMAT.md)** - How to write blog posts
+- **[DEPLOYMENT.md](docs/DEPLOYMENT.md)** - Deploy to Streamlit Cloud (free!)
+- **[ROADMAP.md](docs/ROADMAP.md)** - Project roadmap and future plans
+- **[CLAUDE.md](docs/CLAUDE.md)** - Development guide for contributors
 
 ---
 
@@ -212,8 +212,8 @@ python scripts/test_rag.py
 
 ## 📚 Documentation
 
-- [ROADMAP.md](ROADMAP.md) - Detailed development roadmap and timeline
-- [agent.md](agent.md) - Development standards and best practices
+- [ROADMAP.md](docs/ROADMAP.md) - Detailed development roadmap and timeline
+- [CLAUDE.md](docs/CLAUDE.md) - Development standards and best practices
 - [CONTRIBUTING.md](CONTRIBUTING.md) - How to contribute (coming soon)
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) - System architecture (coming soon)
 
@@ -254,7 +254,7 @@ python scripts/test_rag.py
 **Test Results:** 120/127 tests passing, ~75% code coverage
 **Next Steps:** Creating real blog content, then deploying to Streamlit Cloud
 
-See [ROADMAP.md](ROADMAP.md) for detailed timeline and [docs/TEST_SUMMARY.md](docs/TEST_SUMMARY.md) for test details.
+See [ROADMAP.md](docs/ROADMAP.md) for detailed timeline and [docs/TEST_SUMMARY.md](docs/TEST_SUMMARY.md) for test details.
 
 ---
 
@@ -294,7 +294,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines (coming soon).
 - 🎯 Advanced features
 - 🎯 Community growth
 
-See [ROADMAP.md](ROADMAP.md) for complete details.
+See [ROADMAP.md](docs/ROADMAP.md) for complete details.
 
 ---
 
