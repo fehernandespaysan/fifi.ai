@@ -11,7 +11,7 @@ This script:
 6. Demonstrates conversation history
 
 Usage:
-    python scripts/test_rag.py
+    python examples/interactive_rag_demo.py
 """
 
 import sys
@@ -71,7 +71,7 @@ def main():
         blogs = loader.load_all_blogs()
 
         if not blogs:
-            print("❌ No blog posts found. Run scripts/test_embeddings.py first.")
+            print("❌ No blog posts found. Run examples/generate_embeddings.py first.")
             return 1
 
         print(f"   Found {len(blogs)} blogs. Generating embeddings...")

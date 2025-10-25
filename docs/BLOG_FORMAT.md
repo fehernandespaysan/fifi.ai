@@ -103,7 +103,7 @@ A: Yes, but keep it simple. Stick to markdown when possible.
 **Q: What happens when I add a new blog?**
 A: The system will automatically index it on next query. Or run:
 ```bash
-python scripts/test_embeddings.py
+python examples/generate_embeddings.py
 ```
 
 **Q: Can I edit existing blogs?**

@@ -3,7 +3,7 @@
 Test script to load and display blog statistics
 
 Usage:
-    python scripts/test_blog_loading.py
+    python examples/load_and_inspect_blogs.py
 """
 
 import sys

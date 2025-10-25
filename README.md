@@ -151,7 +151,7 @@ Visit `http://localhost:8501` - Your branded chatbot is live!
 
 5. **Verify setup**
    ```bash
-   python scripts/setup.py
+   python examples/verify_setup.py
    ```
 
 ### Using Fifi.ai
@@ -193,19 +193,22 @@ python chat.py
 # /exit     - Exit chatbot
 ```
 
-#### Option 3: Test Scripts
+#### Option 3: Example Scripts
 
-Run individual test scripts to explore functionality:
+Run individual example scripts to explore functionality:
 
 ```bash
-# Test blog loading
-python scripts/test_blog_loading.py
+# Verify your setup
+python examples/verify_setup.py
+
+# Load and inspect blog posts
+python examples/load_and_inspect_blogs.py
 
 # Generate embeddings from blog posts
-python scripts/test_embeddings.py
+python examples/generate_embeddings.py
 
 # Test the complete RAG pipeline
-python scripts/test_rag.py
+python examples/interactive_rag_demo.py
 ```
 
 ---

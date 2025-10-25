@@ -149,11 +149,11 @@ fifi.ai/
 │   ├── test_rag_engine.py       ✅ 19 tests
 │   └── test_integration.py      ✅ 7 tests (NEW)
 │
-├── scripts/                     ✅ Test scripts
-│   ├── setup.py
-│   ├── test_blog_loading.py
-│   ├── test_embeddings.py
-│   └── test_rag.py
+├── examples/                    ✅ Example/demo scripts
+│   ├── verify_setup.py
+│   ├── load_and_inspect_blogs.py
+│   ├── generate_embeddings.py
+│   └── interactive_rag_demo.py
 │
 ├── docs/                        ✅ Documentation
 │   ├── TEST_SUMMARY.md          ✅ Test results

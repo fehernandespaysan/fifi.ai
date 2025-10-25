@@ -55,8 +55,8 @@ fifis-ai/
 │   ├── API.md                  # API documentation
 │   └── CONTRIBUTING.md         # Contributing guide
 │
-├── scripts/
-│   ├── setup.py                # Setup validation
+├── examples/
+│   ├── verify_setup.py         # Setup validation
 │   └── generate_embeddings.py  # Generate initial embeddings
 │
 └── streamlit_app.py            # Simple UI (later phase)
@@ -971,7 +971,7 @@ aws s3 cp s3://fifi-backups/faiss/2025-10-23.tar.gz ./
 
 # 3. Extract and verify
 tar -xzf 2025-10-23.tar.gz
-python scripts/verify_index.py
+python examples/verify_index.py
 
 # 4. Replace current index
 mv backup.faiss data/faiss_index.faiss

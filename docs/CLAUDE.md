@@ -32,7 +32,7 @@ cp .env.example .env
 # Edit .env and add OPENAI_API_KEY
 
 # Verify setup
-python scripts/setup.py
+python examples/verify_setup.py
 ```
 
 ### Running the Application
@@ -49,16 +49,16 @@ streamlit run streamlit_app.py
 python chat.py
 ```
 
-**Test Scripts**
+**Example Scripts**
 ```bash
-# Test blog loading
-python scripts/test_blog_loading.py
+# Load and inspect blogs
+python examples/load_and_inspect_blogs.py
 
 # Generate embeddings
-python scripts/test_embeddings.py
+python examples/generate_embeddings.py
 
 # Test RAG pipeline
-python scripts/test_rag.py
+python examples/interactive_rag_demo.py
 ```
 
 ### Testing
@@ -226,7 +226,7 @@ Your content here...
 
 2. Regenerate embeddings:
 ```bash
-python scripts/test_embeddings.py
+python examples/generate_embeddings.py
 ```
 
 3. The index will auto-update on next query in the apps

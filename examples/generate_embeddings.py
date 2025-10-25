@@ -11,7 +11,7 @@ This script:
 6. Saves and reloads the index
 
 Usage:
-    python scripts/test_embeddings.py
+    python examples/generate_embeddings.py
 """
 
 import sys

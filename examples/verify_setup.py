@@ -6,7 +6,7 @@ This script validates the environment setup, checks dependencies,
 tests API connectivity, and ensures everything is ready for development.
 
 Usage:
-    python scripts/setup.py
+    python examples/verify_setup.py
 """
 
 import sys
@@ -255,7 +255,7 @@ class SetupValidator:
             print("\n  🎉 Setup validation successful! You're ready to start developing.")
             print("\n  Next steps:")
             print("    1. Add some blog posts to the blogs/ directory")
-            print("    2. Run: python scripts/generate_embeddings.py (coming soon)")
+            print("    2. Run: python examples/generate_embeddings.py")
             print("    3. Run: python main.py (coming soon)")
         else:
             print("\n  ⚠️  Setup validation failed. Please fix the issues above.")
