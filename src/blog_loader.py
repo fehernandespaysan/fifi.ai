@@ -263,9 +263,9 @@ class BlogLoader:
         Raises:
             MissingFrontmatterError: If frontmatter not found or invalid
         """
-        # Match YAML frontmatter between --- delimiters
-        frontmatter_pattern = r"^---\s*\n(.*?)\n---\s*\n(.*)$"
-        match = re.match(frontmatter_pattern, raw_content, re.DOTALL)
+        # Match YAML frontmatter between --- delimiters (allowing leading content like HTML comments)
+        frontmatter_pattern = r"(?:.*?)^---\s*\n(.*?)\n---\s*\n(.*)$"
+        match = re.match(frontmatter_pattern, raw_content, re.DOTALL | re.MULTILINE)
 
         if not match:
             raise MissingFrontmatterError(
