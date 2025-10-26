@@ -149,10 +149,11 @@ User Query → RAG Engine → Vector Search (FAISS) → Top-K Chunks
 
 ### Key Design Decisions
 
-**Vector Database**: FAISS (local) for MVP, designed to migrate to Pinecone for scale
-- Fast similarity search (<100ms p95)
-- No external dependencies for development
-- Save/load to disk for persistence
+**Vector Database**: Supports both FAISS (local) and Pinecone (cloud) via abstraction layer
+- **FAISS**: Fast similarity search (<100ms p95), no external dependencies, disk persistence
+- **Pinecone**: Cloud-managed, automatic scaling, high availability
+- Switch between backends via `VECTOR_STORE_TYPE` environment variable
+- Production-ready with both options
 
 **LLM Model**: GPT-4o-mini by default
 - Cost-effective: $0.00015/1K input tokens, $0.0006/1K output tokens
