@@ -1,0 +1,105 @@
+# Streamlit Configuration for Fifi.ai
+# This file controls app appearance, theming, and behavior
+
+# =============================================================================
+# Theme Configuration
+# =============================================================================
+# Default theme (light mode)
+# Users can toggle to dark mode via the sidebar toggle button
+
+[theme]
+# Primary brand color (used for interactive elements)
+primaryColor = "#1a1a1a"
+
+# Main background color (light gray)
+backgroundColor = "#fafafa"
+
+# Secondary background color (white for cards/containers)
+secondaryBackgroundColor = "#ffffff"
+
+# Text color
+textColor = "#1a1a1a"
+
+# Font family
+font = "sans serif"
+
+# =============================================================================
+# Server Configuration
+# =============================================================================
+
+[server]
+# Enable CORS for development
+enableCORS = false
+
+# Enable XSRF protection
+enableXsrfProtection = true
+
+# Max upload size (in MB) for file uploads
+maxUploadSize = 10
+
+# Port (default: 8501)
+# port = 8501
+
+# Address to bind to
+# address = "localhost"
+
+# =============================================================================
+# Browser Configuration
+# =============================================================================
+
+[browser]
+# Automatically open browser on startup
+gatherUsageStats = false
+
+# Server address (useful for deployment)
+# serverAddress = "localhost"
+
+# Server port
+# serverPort = 8501
+
+# =============================================================================
+# Client Configuration
+# =============================================================================
+
+[client]
+# Display toolbar in the top right corner
+toolbarMode = "minimal"
+
+# Show error details in the browser
+showErrorDetails = true
+
+# Show warning about not using HTTPS
+showWarningOnDirectExecution = false
+
+# =============================================================================
+# UI Configuration
+# =============================================================================
+
+[ui]
+# Hide the "hamburger" menu in the top right
+hideTopBar = false
+
+# Hide the footer "Made with Streamlit"
+hideSidebarNav = false
+
+# =============================================================================
+# Runner Configuration
+# =============================================================================
+
+[runner]
+# Magic commands (automatically displays variables)
+magicEnabled = true
+
+# Rerun script when file changes (development)
+fastReruns = true
+
+# Post script automatically after execution
+postScriptGC = true
+
+# =============================================================================
+# Deprecation Configuration
+# =============================================================================
+
+[deprecation]
+# Show deprecation warnings
+showPyplotGlobalUse = false

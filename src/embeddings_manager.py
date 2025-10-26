@@ -129,6 +129,11 @@ class EmbeddingsManager:
             },
         )
 
+    @property
+    def index(self):
+        """Backward compatibility property to access vector_store.index."""
+        return getattr(self.vector_store, 'index', None)
+
     def chunk_text(self, text: str, metadata: Dict[str, Any]) -> List[Chunk]:
         """
         Split text into overlapping chunks.

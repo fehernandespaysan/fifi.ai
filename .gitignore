@@ -238,3 +238,9 @@ logs/
 # Temporary files
 tmp/
 temp/.DS_Store
+
+# Custom prompt overrides
+# Users can create custom/*.yaml files for their own prompt variations
+prompts/custom/
+prompts/*.local.yaml
+prompts/*_custom.yaml

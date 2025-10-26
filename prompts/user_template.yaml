@@ -1,0 +1,39 @@
+# Fifi.ai User Prompt Template
+# This template is used for RAG queries with context
+
+name: "RAG Query Template"
+version: "1.0.0"
+description: "Template for formatting user queries with retrieved context"
+
+# Template with placeholders: {context} and {question}
+template: |
+  Use the following context from blog posts to answer the user's question.
+
+  Context:
+  {context}
+
+  Question: {question}
+
+  Instructions:
+  - Answer based primarily on the provided context
+  - If the context doesn't fully answer the question, say so
+  - Cite specific sources when referencing information
+  - Be clear, concise, and helpful
+  - Use markdown formatting for better readability
+
+  Answer:
+
+# Placeholders that must be filled when using this template
+placeholders:
+  - name: "context"
+    description: "Retrieved context from vector database (formatted with source citations)"
+    required: true
+  - name: "question"
+    description: "The user's original question"
+    required: true
+
+# Metadata
+metadata:
+  author: "Fifi.ai Team"
+  created: "2025-10-26"
+  use_case: "RAG context-based responses"

@@ -14,9 +14,13 @@
 
 - 🚀 **5-Minute Setup** - Clone → Configure → Deploy
 - 🎨 **Easy Branding** - Customize name, colors, messages via `.env`
+- 🎯 **Customizable Prompts** - Edit AI personality via YAML files (no code!)
 - 📝 **Just Add Content** - Drop `.md` files in `blogs/` folder
-- 🤖 **Production RAG** - FAISS vector search + OpenAI embeddings
+- 🤖 **Production RAG** - FAISS/Pinecone vector search + OpenAI embeddings
 - 💬 **Dual Interface** - Streamlit web UI + CLI chatbot
+- 🌓 **Dark Mode** - Toggle between light and dark themes
+- ⚡ **Streaming Responses** - ChatGPT-style word-by-word generation
+- 📱 **Mobile Responsive** - Works beautifully on all devices
 - 🔒 **Security Built-In** - API key sanitization, input validation
 - 📊 **Observability** - Structured logging, metrics tracking
 - ✅ **127 Tests Included** - Production-ready code quality
@@ -82,11 +86,19 @@ Visit `http://localhost:8501` - Your branded chatbot is live!
 
 ## 📖 Documentation
 
-- **[CUSTOMIZATION.md](docs/CUSTOMIZATION.md)** - How to brand and customize
-- **[BLOG_FORMAT.md](docs/BLOG_FORMAT.md)** - How to write blog posts
-- **[DEPLOYMENT.md](docs/DEPLOYMENT.md)** - Deploy to Streamlit Cloud (free!)
-- **[ROADMAP.md](docs/ROADMAP.md)** - Project roadmap and future plans
-- **[CLAUDE.md](docs/CLAUDE.md)** - Development guide for contributors
+### User Guides
+- **[CUSTOMIZATION.md](docs/CUSTOMIZATION.md)** - Branding and customization
+- **[BLOG_FORMAT.md](docs/BLOG_FORMAT.md)** - Blog writing guide
+- **[DEPLOYMENT.md](docs/DEPLOYMENT.md)** - Deploy to production
+- **[prompts/README.md](prompts/README.md)** - AI prompt customization
+
+### Features & Testing
+- **[FRONTEND.md](docs/FRONTEND.md)** - Dark mode, streaming, mobile features
+- **[TEST_SUMMARY.md](docs/TEST_SUMMARY.md)** - Test results and coverage
+
+### Developer Guides
+- **[ROADMAP.md](docs/ROADMAP.md)** - Project phases and timeline
+- **[CLAUDE.md](docs/CLAUDE.md)** - Development standards
 
 ---
 
@@ -172,6 +184,9 @@ Then open your browser to `http://localhost:8501`
 
 **Features:**
 - 💬 Beautiful chat interface
+- 🌓 Dark mode with theme switcher
+- ⚡ Streaming responses (ChatGPT-style)
+- 📱 Mobile responsive design
 - 📊 Real-time statistics dashboard
 - 📚 Source citations with expandable details
 - 🎨 Markdown rendering
@@ -210,15 +225,6 @@ python examples/generate_embeddings.py
 # Test the complete RAG pipeline
 python examples/interactive_rag_demo.py
 ```
-
----
-
-## 📚 Documentation
-
-- [ROADMAP.md](docs/ROADMAP.md) - Detailed development roadmap and timeline
-- [CLAUDE.md](docs/CLAUDE.md) - Development standards and best practices
-- [CONTRIBUTING.md](CONTRIBUTING.md) - How to contribute (coming soon)
-- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) - System architecture (coming soon)
 
 ---
 

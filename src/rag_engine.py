@@ -30,6 +30,7 @@ from openai import OpenAI
 from src.config import get_config
 from src.embeddings_manager import EmbeddingsManager, SearchResult
 from src.logger import LoggerContext, get_logger
+from src.prompt_loader import PromptLoader
 
 logger = get_logger(__name__)
 
@@ -124,16 +125,21 @@ class RAGEngine:
         self,
         embeddings_manager: Optional[EmbeddingsManager] = None,
         system_prompt: Optional[str] = None,
+        prompt_loader: Optional[PromptLoader] = None,
     ):
         """
         Initialize the RAG engine.
 
         Args:
             embeddings_manager: EmbeddingsManager instance (creates new if None)
-            system_prompt: Custom system prompt (uses default if None)
+            system_prompt: Custom system prompt (uses default from YAML if None)
+            prompt_loader: PromptLoader instance (creates new if None)
         """
         config = get_config()
         self.config = config
+
+        # Initialize prompt loader
+        self.prompt_loader = prompt_loader or PromptLoader()
 
         # Initialize embeddings manager
         self.embeddings_manager = embeddings_manager or EmbeddingsManager()
@@ -148,11 +154,14 @@ class RAGEngine:
         self.temperature = config.openai_temperature
         self.max_tokens = config.openai_max_tokens
 
-        # Set system prompt
+        # Set system prompt (from custom arg or load from YAML)
         self.system_prompt = system_prompt or self._get_default_system_prompt()
 
-        # Create prompt template
+        # Create prompt template (load from YAML)
         self.user_prompt_template = self._get_user_prompt_template()
+
+        # Load fallback prompt configuration
+        self.fallback_config = self.prompt_loader.get_fallback_prompt()
 
         # Conversation history
         self.conversation_history: List[ConversationMessage] = []
@@ -180,8 +189,13 @@ class RAGEngine:
         )
 
     def _get_default_system_prompt(self) -> str:
-        """Get the default system prompt for the RAG assistant."""
-        return """You are Fifi, a helpful AI assistant that answers questions about AI engineering, RAG systems, and related topics.
+        """Get the default system prompt for the RAG assistant from YAML config."""
+        try:
+            return self.prompt_loader.get_system_prompt()
+        except Exception as e:
+            logger.warning(f"Failed to load system prompt from YAML: {e}, using fallback")
+            # Fallback to hardcoded prompt if YAML loading fails
+            return """You are Fifi, a helpful AI assistant that answers questions about AI engineering, RAG systems, and related topics.
 
 Your knowledge comes from a curated collection of blog posts and articles. Always:
 - Provide accurate, helpful answers based on the given context
@@ -194,8 +208,13 @@ Your knowledge comes from a curated collection of blog posts and articles. Alway
 If the context doesn't contain enough information to answer the question, say so honestly and offer to help with related topics you do know about."""
 
     def _get_user_prompt_template(self) -> str:
-        """Get the user prompt template for RAG queries."""
-        template = """Use the following context from blog posts to answer the user's question.
+        """Get the user prompt template for RAG queries from YAML config."""
+        try:
+            return self.prompt_loader.get_user_template()
+        except Exception as e:
+            logger.warning(f"Failed to load user template from YAML: {e}, using fallback")
+            # Fallback to hardcoded template if YAML loading fails
+            return """Use the following context from blog posts to answer the user's question.
 
 Context:
 {context}
@@ -210,8 +229,6 @@ Instructions:
 - Use markdown formatting for better readability
 
 Answer:"""
-
-        return template
 
     def query(self, query_text: str, top_k: Optional[int] = None) -> RAGResponse:
         """
@@ -414,11 +431,239 @@ Answer:"""
             logger.error(f"Response generation failed: {str(e)}", exc_info=True)
             raise RAGEngineError(f"Failed to generate response: {str(e)}")
 
+    def query_stream(
+        self, query_text: str, top_k: Optional[int] = None
+    ) -> Iterator[Dict[str, Any]]:
+        """
+        Process a query and stream the response in chunks.
+
+        This method retrieves context and then streams the AI response
+        word-by-word for better perceived performance.
+
+        Args:
+            query_text: User's question
+            top_k: Number of chunks to retrieve (uses default if None)
+
+        Yields:
+            Dictionary with keys:
+                - type: "chunk" | "sources" | "metadata" | "error"
+                - content: The actual content (text chunk, sources list, etc.)
+                - For chunks: {"type": "chunk", "content": "text..."}
+                - For sources: {"type": "sources", "content": [sources]}
+                - For metadata: {"type": "metadata", "content": {...}}
+        """
+        with LoggerContext() as correlation_id:
+            start_time = time.time()
+
+            logger.info(
+                "Processing streaming RAG query",
+                extra={
+                    "query_length": len(query_text),
+                    "top_k": top_k or self.top_k,
+                    "correlation_id": correlation_id,
+                },
+            )
+
+            try:
+                # Step 1: Retrieve relevant context
+                retrieval_start = time.time()
+                sources = self._retrieve_context(query_text, top_k)
+                retrieval_time_ms = int((time.time() - retrieval_start) * 1000)
+
+                if not sources:
+                    logger.warning(
+                        "No relevant context found for streaming query",
+                        extra={"query": query_text[:100]},
+                    )
+                    # Yield empty sources list
+                    yield {"type": "sources", "content": []}
+
+                    # Stream a conversational response without specific context
+                    generation_start = time.time()
+                    full_answer = ""
+                    tokens_used = 0
+
+                    try:
+                        # Create a fallback prompt for general conversation using YAML config
+                        fallback_prompt = self.fallback_config["template"].format(query=query_text)
+                        fallback_system = self.fallback_config["system_prompt"]
+
+                        messages = [
+                            {"role": "system", "content": fallback_system},
+                            {"role": "user", "content": fallback_prompt},
+                        ]
+
+                        # Call OpenAI API with streaming
+                        stream = self.openai_client.chat.completions.create(
+                            model=self.model,
+                            messages=messages,
+                            temperature=self.temperature,
+                            max_tokens=self.max_tokens,
+                            stream=True,
+                        )
+
+                        # Stream chunks
+                        for chunk in stream:
+                            if chunk.choices[0].delta.content:
+                                content = chunk.choices[0].delta.content
+                                full_answer += content
+                                yield {"type": "chunk", "content": content}
+
+                        tokens_used = len(query_text + full_answer) // 4
+
+                    except Exception as e:
+                        logger.error(f"Fallback generation failed: {str(e)}", exc_info=True)
+                        yield {
+                            "type": "error",
+                            "content": f"Failed to generate response: {str(e)}",
+                        }
+                        return
+
+                    generation_time_ms = int((time.time() - generation_start) * 1000)
+                    total_time_ms = int((time.time() - start_time) * 1000)
+
+                    # Update metrics
+                    self.total_queries += 1
+                    self.total_tokens_used += tokens_used
+                    self.total_retrieval_time_ms += retrieval_time_ms
+                    self.total_generation_time_ms += generation_time_ms
+
+                    # Yield completion
+                    yield {
+                        "type": "complete",
+                        "tokens_used": tokens_used,
+                        "retrieval_time_ms": retrieval_time_ms,
+                        "generation_time_ms": generation_time_ms,
+                        "total_time_ms": total_time_ms,
+                    }
+                    return
+
+                # Step 2: Format context
+                context = self._format_context(sources)
+
+                # Yield sources immediately
+                yield {"type": "sources", "content": sources}
+
+                # Step 3: Stream response generation
+                generation_start = time.time()
+                full_answer = ""
+                tokens_used = 0
+
+                try:
+                    # Format user prompt
+                    user_prompt = self.user_prompt_template.format(
+                        context=context, question=query_text
+                    )
+
+                    # Create messages
+                    messages = [
+                        {"role": "system", "content": self.system_prompt},
+                        {"role": "user", "content": user_prompt},
+                    ]
+
+                    # Call OpenAI API with streaming
+                    stream = self.openai_client.chat.completions.create(
+                        model=self.model,
+                        messages=messages,
+                        temperature=self.temperature,
+                        max_tokens=self.max_tokens,
+                        stream=True,
+                    )
+
+                    # Stream chunks
+                    for chunk in stream:
+                        if chunk.choices[0].delta.content:
+                            content = chunk.choices[0].delta.content
+                            full_answer += content
+                            yield {"type": "chunk", "content": content}
+
+                    # Estimate tokens (rough approximation: ~4 chars per token)
+                    tokens_used = len(query_text + context + full_answer) // 4
+
+                except Exception as e:
+                    logger.error(f"Streaming generation failed: {str(e)}", exc_info=True)
+                    yield {
+                        "type": "error",
+                        "content": f"Failed to generate response: {str(e)}",
+                    }
+                    return
+
+                generation_time_ms = int((time.time() - generation_start) * 1000)
+
+                # Step 4: Update metrics
+                total_time_ms = int((time.time() - start_time) * 1000)
+                self.total_queries += 1
+                self.total_tokens_used += tokens_used
+                self.total_retrieval_time_ms += retrieval_time_ms
+                self.total_generation_time_ms += generation_time_ms
+
+                # Step 5: Update conversation history
+                self._add_to_history("user", query_text)
+                self._add_to_history("assistant", full_answer)
+
+                # Yield metadata
+                yield {
+                    "type": "metadata",
+                    "content": {
+                        "tokens_used": tokens_used,
+                        "retrieval_time_ms": retrieval_time_ms,
+                        "generation_time_ms": generation_time_ms,
+                        "total_time_ms": total_time_ms,
+                        "num_sources": len(sources),
+                        "correlation_id": correlation_id,
+                    },
+                }
+
+                logger.info(
+                    "Streaming RAG query completed",
+                    extra={
+                        "tokens_used": tokens_used,
+                        "total_time_ms": total_time_ms,
+                        "retrieval_time_ms": retrieval_time_ms,
+                        "generation_time_ms": generation_time_ms,
+                    },
+                )
+
+            except Exception as e:
+                logger.error(f"Streaming RAG query failed: {str(e)}", exc_info=True)
+                yield {
+                    "type": "error",
+                    "content": f"Query processing failed: {str(e)}",
+                }
+
     def _create_no_context_response(
         self, query: str, retrieval_time_ms: int
     ) -> RAGResponse:
-        """Create a response when no relevant context is found."""
-        answer = "I couldn't find relevant information in my knowledge base to answer your question. This might be because:\n\n1. The topic isn't covered in the blog posts I have access to\n2. Your question might need to be rephrased\n3. The question is too specific or too broad\n\nCould you try rephrasing your question or asking about a related topic?"
+        """Create a conversational response when no relevant context is found."""
+        generation_start = time.time()
+
+        # Create a fallback prompt for general conversation using YAML config
+        fallback_prompt = self.fallback_config["template"].format(query=query)
+        fallback_system = self.fallback_config["system_prompt"]
+
+        try:
+            messages = [
+                {"role": "system", "content": fallback_system},
+                {"role": "user", "content": fallback_prompt},
+            ]
+
+            response = self.openai_client.chat.completions.create(
+                model=self.model,
+                messages=messages,
+                temperature=self.temperature,
+                max_tokens=self.max_tokens,
+            )
+
+            answer = response.choices[0].message.content
+            tokens_used = response.usage.total_tokens
+
+        except Exception as e:
+            logger.error(f"Fallback response generation failed: {str(e)}", exc_info=True)
+            # Fallback to static message if LLM call fails
+            answer = "I couldn't find relevant information in my knowledge base. I can help you with topics like RAG, Vector Databases, and AI Security. What would you like to know?"
+            tokens_used = 0
+
+        generation_time_ms = int((time.time() - generation_start) * 1000)
 
         return RAGResponse(
             query=query,
@@ -426,10 +671,10 @@ Answer:"""
             sources=[],
             context="",
             model=self.model,
-            tokens_used=0,
+            tokens_used=tokens_used,
             retrieval_time_ms=retrieval_time_ms,
-            generation_time_ms=0,
-            total_time_ms=retrieval_time_ms,
+            generation_time_ms=generation_time_ms,
+            total_time_ms=retrieval_time_ms + generation_time_ms,
             metadata={"no_context": True},
         )
 

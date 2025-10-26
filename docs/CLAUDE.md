@@ -113,23 +113,31 @@ Fifi.ai follows a layered architecture:
 2. **Embeddings Layer** (`src/embeddings_manager.py`)
    - Chunks blog content into 500-token pieces
    - Generates embeddings using OpenAI's `text-embedding-3-small`
-   - Manages FAISS vector index for similarity search
-   - Handles save/load of index to disk
+   - Manages vector store (FAISS or Pinecone) via abstraction layer
+   - Handles save/load of index to disk (FAISS) or cloud (Pinecone)
 
-3. **RAG Engine** (`src/rag_engine.py`)
+3. **Prompt Management** (`src/prompt_loader.py`, `prompts/*.yaml`)
+   - Loads AI prompts from YAML configuration files
+   - Separates prompt content from code for easy customization
+   - Supports hot-reloading and custom prompt variants
+   - Three core prompts: system, user template, fallback
+
+4. **RAG Engine** (`src/rag_engine.py`)
    - Core query processing pipeline
    - Retrieves top-5 relevant chunks via vector search
-   - Constructs prompts with retrieved context
+   - Constructs prompts with retrieved context using PromptLoader
    - Calls OpenAI API (GPT-4o-mini by default)
    - Returns answers with source citations
+   - Handles conversational fallbacks for out-of-domain queries
 
-4. **User Interfaces**
+5. **User Interfaces**
    - **Streamlit UI** (`streamlit_app.py`): Modern web interface with chat, sources, and statistics
    - **CLI** (`src/cli_chatbot.py`): Terminal-based chatbot with Rich formatting
 
-5. **Infrastructure**
+6. **Infrastructure**
    - **Config** (`src/config.py`): Environment-specific configuration management
    - **Logger** (`src/logger.py`): Structured JSON logging with correlation IDs
+   - **Vector Store** (`src/vector_store/`): Abstract interface supporting FAISS and Pinecone
 
 ### Data Flow
 
@@ -231,6 +239,29 @@ python examples/generate_embeddings.py
 
 3. The index will auto-update on next query in the apps
 
+### Customizing AI Prompts
+
+Edit YAML files in `prompts/` directory:
+
+1. **System Prompt** (`prompts/system_prompt.yaml`):
+   - Defines Fifi's personality and behavior
+   - Set tone, communication style, knowledge domains
+
+2. **User Template** (`prompts/user_template.yaml`):
+   - Format for RAG queries with context
+   - Customize citation requirements, response format
+
+3. **Fallback Prompt** (`prompts/fallback_prompt.yaml`):
+   - Handles out-of-domain queries
+   - Customize knowledge base topics, conversational tone
+
+Changes take effect immediately on next app restart. See `prompts/README.md` for detailed guide.
+
+**Testing prompt changes:**
+```bash
+python -c "from src.prompt_loader import PromptLoader; loader = PromptLoader(); print(loader.get_system_prompt())"
+```
+
 ### Modifying RAG Parameters
 
 Edit constants in `src/rag_engine.py`:
@@ -326,7 +357,14 @@ See `ROADMAP.md` for detailed timeline. Current phase:
 - `chat.py`: CLI entry point
 - `src/rag_engine.py`: Core RAG logic
 - `src/embeddings_manager.py`: Vector database operations
+- `src/prompt_loader.py`: Prompt loading and management
+- `src/vector_store/`: Vector store abstraction (FAISS, Pinecone)
 - `src/blog_loader.py`: Blog ingestion
+- `prompts/`: AI prompt configuration (YAML files)
+  - `system_prompt.yaml`: Fifi's personality and behavior
+  - `user_template.yaml`: RAG query template
+  - `fallback_prompt.yaml`: Out-of-domain conversation handling
+  - `README.md`: Prompt customization guide
 - `agent.md`: Development standards (security, monitoring, quality)
 - `ROADMAP.md`: Detailed project plan and timeline
 - `pytest.ini`: Test configuration

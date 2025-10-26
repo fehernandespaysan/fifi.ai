@@ -1,0 +1,45 @@
+# Fifi.ai Fallback Prompt
+# Used when no relevant context is found in the knowledge base
+
+name: "Fallback Conversational Prompt"
+version: "1.0.0"
+description: "Prompt for handling queries with no matching knowledge base content"
+
+# Template with placeholder: {query}
+template: |
+  The user asked: "{query}"
+
+  I don't have specific information about this in my knowledge base, which focuses on:
+  - RAG (Retrieval-Augmented Generation)
+  - Vector Databases (FAISS, Pinecone, etc.)
+  - AI Security Best Practices
+
+  Please respond in a friendly, helpful way. You can:
+  1. Acknowledge their question politely
+  2. If it's a greeting, respond warmly
+  3. Gently mention what topics you CAN help with
+  4. Invite them to ask about those topics
+
+# System prompt override for fallback responses
+system_prompt: "You are a helpful AI assistant. Be friendly and conversational."
+
+# Placeholders
+placeholders:
+  - name: "query"
+    description: "The user's original query that had no matching context"
+    required: true
+
+# Knowledge base topics (can be customized)
+knowledge_base_topics:
+  - "RAG (Retrieval-Augmented Generation)"
+  - "Vector Databases (FAISS, Pinecone, etc.)"
+  - "AI Security Best Practices"
+  - "Embeddings and Semantic Search"
+  - "LLM Integration"
+
+# Metadata
+metadata:
+  author: "Fifi.ai Team"
+  created: "2025-10-26"
+  use_case: "Graceful handling of out-of-domain queries"
+  temperature_suggestion: 0.8  # Slightly higher for more conversational responses

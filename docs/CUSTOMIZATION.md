@@ -91,6 +91,54 @@ st.set_page_config(
 )
 ```
 
+### Customize AI Prompts 🎯 NEW!
+
+Edit how Fifi thinks, talks, and responds by modifying YAML files in `prompts/`:
+
+```bash
+# Edit Fifi's personality
+nano prompts/system_prompt.yaml
+
+# Edit how Fifi formats answers with context
+nano prompts/user_template.yaml
+
+# Edit how Fifi handles out-of-scope questions
+nano prompts/fallback_prompt.yaml
+```
+
+**Quick examples:**
+
+**Make Fifi more technical:**
+```yaml
+# prompts/system_prompt.yaml
+prompt: |
+  You are Fifi, an expert AI engineering assistant specialized in
+  RAG systems and production ML deployments.
+
+  Always provide technically accurate answers with code examples...
+```
+
+**Make Fifi more conversational:**
+```yaml
+# prompts/system_prompt.yaml
+prompt: |
+  You are Fifi, a friendly AI assistant who loves explaining AI
+  concepts in simple, relatable terms.
+
+  Use analogies and everyday examples...
+```
+
+**Change knowledge base topics:**
+```yaml
+# prompts/fallback_prompt.yaml
+knowledge_base_topics:
+  - "Machine Learning"
+  - "Data Science"
+  - "Python Programming"
+```
+
+**For detailed prompt customization guide**, see [`prompts/README.md`](../prompts/README.md)
+
 ---
 
 ## Tips
@@ -99,7 +147,11 @@ st.set_page_config(
 - **Test locally**: Always test changes before deploying
 - **Version control**: Commit after major customizations
 - **Back up .env**: But never commit it to git!
+- **Edit prompts safely**: Create custom variants in `prompts/custom/` for testing
 
 ---
 
-**Need help?** See `README.md` for setup instructions or `BLOG_FORMAT.md` for blog post formatting.
+**Need help?**
+- Setup instructions: `README.md`
+- Blog formatting: `BLOG_FORMAT.md`
+- Prompt editing: `prompts/README.md`
