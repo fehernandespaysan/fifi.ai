@@ -89,11 +89,32 @@ class PineconeVectorStore(VectorStore):
             if not index_exists:
                 # Create new index (Serverless for free tier)
                 logger.info(f"Creating new Pinecone index: {self.index_name}")
+
+                # Parse environment string
+                # Formats: "us-east-1-aws", "us-west1-gcp", "us-central1-gcp-free", etc.
+                # Extract cloud and region from environment
+                if "gcp" in self.environment:
+                    cloud = "gcp"
+                    # GCP regions: "us-west1", "us-central1", etc. (2 parts)
+                    region = "-".join(self.environment.split("-")[:2])
+                elif "aws" in self.environment:
+                    cloud = "aws"
+                    # AWS regions: "us-east-1", "us-west-2", etc. (3 parts)
+                    region = "-".join(self.environment.split("-")[:3])
+                elif "azure" in self.environment:
+                    cloud = "azure"
+                    # Azure regions: similar to AWS
+                    region = "-".join(self.environment.split("-")[:3])
+                else:
+                    # Default: assume it's just the region name
+                    cloud = "gcp"
+                    region = self.environment
+
                 self.pc.create_index(
                     name=self.index_name,
                     dimension=self.dimension,
                     metric=self.metric,
-                    spec=ServerlessSpec(cloud="gcp", region=self.environment.split("-")[0]),
+                    spec=ServerlessSpec(cloud=cloud, region=region),
                 )
 
                 # Wait for index to be ready

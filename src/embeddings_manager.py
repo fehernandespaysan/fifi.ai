@@ -410,11 +410,28 @@ class EmbeddingsManager:
                     logger.warning("Result missing chunk_id, skipping")
                     continue
 
-                # Get chunk from our map
+                # Get chunk from our map, or reconstruct from metadata
                 chunk = self.chunk_map.get(chunk_id)
                 if not chunk:
-                    logger.warning(f"Chunk {chunk_id} not found in map, skipping")
-                    continue
+                    # Reconstruct chunk from Pinecone metadata
+                    try:
+                        chunk = Chunk(
+                            text=vec_result.metadata.get("text", ""),
+                            blog_title=vec_result.metadata.get("blog_title", "Unknown"),
+                            blog_file=vec_result.metadata.get("blog_file", "Unknown"),
+                            chunk_index=int(vec_result.metadata.get("chunk_index", 0)),
+                            start_pos=int(vec_result.metadata.get("start_pos", 0)),
+                            end_pos=int(vec_result.metadata.get("end_pos", 0)),
+                            metadata={
+                                k: v for k, v in vec_result.metadata.items()
+                                if k not in ["chunk_id", "text", "blog_title", "blog_file", "chunk_index", "start_pos", "end_pos"]
+                            }
+                        )
+                        # Cache it for future use
+                        self.chunk_map[chunk_id] = chunk
+                    except Exception as e:
+                        logger.warning(f"Failed to reconstruct chunk {chunk_id}: {e}")
+                        continue
 
                 result = SearchResult(
                     chunk=chunk,
