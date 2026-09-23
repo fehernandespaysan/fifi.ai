@@ -13,6 +13,7 @@ from unittest.mock import MagicMock, Mock, patch
 
 import faiss
 import numpy as np
+import openai
 import pytest
 
 from src.blog_loader import Blog
@@ -203,7 +204,7 @@ class TestEmbeddingsManager:
     def test_generate_embedding_error(self, mock_openai_class, embeddings_manager):
         """Test error handling in generate_embedding."""
         mock_client = Mock()
-        mock_client.embeddings.create.side_effect = Exception("API Error")
+        mock_client.embeddings.create.side_effect = openai.APIError("API Error", request=None, body=None)
         embeddings_manager.openai_client = mock_client
 
         with pytest.raises(EmbeddingsError) as exc_info:
@@ -245,7 +246,7 @@ class TestEmbeddingsManager:
     def test_generate_embeddings_batch_error(self, mock_openai_class, embeddings_manager):
         """Test error handling in batch embedding generation."""
         mock_client = Mock()
-        mock_client.embeddings.create.side_effect = Exception("Batch API Error")
+        mock_client.embeddings.create.side_effect = openai.APIError("Batch API Error", request=None, body=None)
         embeddings_manager.openai_client = mock_client
 
         with pytest.raises(EmbeddingsError) as exc_info:

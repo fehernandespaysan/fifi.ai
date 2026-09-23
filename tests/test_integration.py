@@ -10,6 +10,7 @@ from datetime import datetime
 from pathlib import Path
 from unittest.mock import Mock, patch
 
+import openai
 import pytest
 
 from src.blog_loader import Blog, BlogLoader
@@ -376,7 +377,7 @@ class TestErrorHandlingAndRecovery:
 
         # Mock API error
         mock_client = Mock()
-        mock_client.embeddings.create.side_effect = Exception("API Error")
+        mock_client.embeddings.create.side_effect = openai.APIError("API Error", request=None, body=None)
         mock_openai.return_value = mock_client
 
         with patch.dict(

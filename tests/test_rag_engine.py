@@ -10,6 +10,7 @@ from datetime import datetime
 from pathlib import Path
 from unittest.mock import Mock, patch
 
+import openai
 import pytest
 
 from src.embeddings_manager import Chunk, EmbeddingsManager, SearchResult
@@ -398,7 +399,7 @@ class TestRAGEngine:
         mock_embeddings_manager.search.return_value = mock_search_results
 
         mock_client = Mock()
-        mock_client.chat.completions.create.side_effect = Exception("API Error")
+        mock_client.chat.completions.create.side_effect = openai.APIError("API Error", request=None, body=None)
         mock_openai_class.return_value = mock_client
 
         engine = RAGEngine(embeddings_manager=mock_embeddings_manager)

@@ -19,6 +19,7 @@ Usage:
     manager.save()
 """
 
+import pickle
 import time
 import uuid
 from dataclasses import dataclass
@@ -26,6 +27,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 import numpy as np
+import openai
 from openai import OpenAI
 
 from src.blog_loader import Blog
@@ -225,8 +227,8 @@ class EmbeddingsManager:
 
             return np.array(embedding, dtype=np.float32)
 
-        except Exception as e:
-            logger.error(f"Failed to generate embedding: {str(e)}", exc_info=True)
+        except openai.APIError as e:
+            logger.error(f"OpenAI API error generating embedding: {str(e)}", exc_info=True)
             raise EmbeddingsError(f"Embedding generation failed: {str(e)}")
 
     def generate_embeddings_batch(self, texts: List[str]) -> np.ndarray:
@@ -282,8 +284,8 @@ class EmbeddingsManager:
 
                 return embeddings_array
 
-        except Exception as e:
-            logger.error(f"Failed to generate batch embeddings: {str(e)}", exc_info=True)
+        except openai.APIError as e:
+            logger.error(f"OpenAI API error generating batch embeddings: {str(e)}", exc_info=True)
             raise EmbeddingsError(f"Batch embedding generation failed: {str(e)}")
 
     def add_documents(self, blogs: List[Blog]) -> None:
@@ -434,7 +436,7 @@ class EmbeddingsManager:
                         )
                         # Cache it for future use
                         self.chunk_map[chunk_id] = chunk
-                    except Exception as e:
+                    except (KeyError, TypeError, ValueError) as e:
                         logger.warning(f"Failed to reconstruct chunk {chunk_id}: {e}")
                         continue
 
@@ -502,7 +504,7 @@ class EmbeddingsManager:
             else:
                 logger.info("Vector store saved (cloud-managed)")
 
-        except Exception as e:
+        except (OSError, IOError, pickle.PicklingError) as e:
             logger.error(f"Failed to save index: {str(e)}", exc_info=True)
             raise EmbeddingsError(f"Save failed: {str(e)}")
 
@@ -554,7 +556,8 @@ class EmbeddingsManager:
             return True
 
         except Exception as e:
-            logger.info(f"Failed to load index (may not exist yet): {str(e)}")
+            # Broad catch intentional: a missing or corrupt index is not fatal on startup.
+            logger.info(f"Failed to load index (may not exist yet): {str(e)}", exc_info=True)
             return False
 
     def clear(self) -> None:

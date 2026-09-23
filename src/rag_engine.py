@@ -25,6 +25,7 @@ import time
 from dataclasses import dataclass, field
 from typing import Any, Dict, Iterator, List, Optional
 
+import openai
 from openai import OpenAI
 
 from src.config import get_config
@@ -192,7 +193,7 @@ class RAGEngine:
         """Get the default system prompt for the RAG assistant from YAML config."""
         try:
             return self.prompt_loader.get_system_prompt()
-        except Exception as e:
+        except (OSError, KeyError, ValueError) as e:
             logger.warning(f"Failed to load system prompt from YAML: {e}, using fallback")
             # Fallback to hardcoded prompt if YAML loading fails
             return """You are Fifi, a helpful AI assistant that answers questions about AI engineering, RAG systems, and related topics.
@@ -211,7 +212,7 @@ If the context doesn't contain enough information to answer the question, say so
         """Get the user prompt template for RAG queries from YAML config."""
         try:
             return self.prompt_loader.get_user_template()
-        except Exception as e:
+        except (OSError, KeyError, ValueError) as e:
             logger.warning(f"Failed to load user template from YAML: {e}, using fallback")
             # Fallback to hardcoded template if YAML loading fails
             return """Use the following context from blog posts to answer the user's question.
@@ -427,8 +428,8 @@ Answer:"""
 
             return answer, tokens_used
 
-        except Exception as e:
-            logger.error(f"Response generation failed: {str(e)}", exc_info=True)
+        except openai.APIError as e:
+            logger.error(f"OpenAI API error during response generation: {str(e)}", exc_info=True)
             raise RAGEngineError(f"Failed to generate response: {str(e)}")
 
     def query_stream(
@@ -511,8 +512,8 @@ Answer:"""
 
                         tokens_used = len(query_text + full_answer) // 4
 
-                    except Exception as e:
-                        logger.error(f"Fallback generation failed: {str(e)}", exc_info=True)
+                    except openai.APIError as e:
+                        logger.error(f"OpenAI API error in fallback generation: {str(e)}", exc_info=True)
                         yield {
                             "type": "error",
                             "content": f"Failed to generate response: {str(e)}",
@@ -580,8 +581,8 @@ Answer:"""
                     # Estimate tokens (rough approximation: ~4 chars per token)
                     tokens_used = len(query_text + context + full_answer) // 4
 
-                except Exception as e:
-                    logger.error(f"Streaming generation failed: {str(e)}", exc_info=True)
+                except openai.APIError as e:
+                    logger.error(f"OpenAI API error during streaming: {str(e)}", exc_info=True)
                     yield {
                         "type": "error",
                         "content": f"Failed to generate response: {str(e)}",
@@ -657,9 +658,9 @@ Answer:"""
             answer = response.choices[0].message.content
             tokens_used = response.usage.total_tokens
 
-        except Exception as e:
-            logger.error(f"Fallback response generation failed: {str(e)}", exc_info=True)
-            # Fallback to static message if LLM call fails
+        except openai.APIError as e:
+            logger.error(f"OpenAI API error in fallback response: {str(e)}", exc_info=True)
+            # Fall back to static message if LLM call fails
             answer = "I couldn't find relevant information in my knowledge base. I can help you with topics like RAG, Vector Databases, and AI Security. What would you like to know?"
             tokens_used = 0
 
