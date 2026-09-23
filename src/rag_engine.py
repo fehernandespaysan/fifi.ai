@@ -695,81 +695,29 @@ Answer:"""
             extra={"history_length": len(self.conversation_history)},
         )
 
-    def query_with_history(self, query_text: str) -> RAGResponse:
-        """
-        Process a query with conversation history context.
-
-        Args:
-            query_text: User's question
-
-        Returns:
-            RAGResponse with answer and metadata
-        """
-        # For now, just call regular query
-        # In future versions, we can use conversation history to enhance context
-        return self.query(query_text)
-
     def stream_query(self, query_text: str, top_k: Optional[int] = None) -> Iterator[str]:
         """
-        Process a query and stream the response.
+        Stream a query response as plain text chunks.
+
+        Delegates to query_stream and extracts the text content, so retrieval
+        logic lives in one place. Yields plain strings for CLI and simple callers.
 
         Args:
             query_text: User's question
             top_k: Number of chunks to retrieve
 
         Yields:
-            Chunks of the generated response
+            Text chunks of the generated response
         """
-        with LoggerContext() as correlation_id:
-            logger.info(
-                "Processing streaming RAG query",
-                extra={"query_length": len(query_text), "correlation_id": correlation_id},
-            )
-
-            try:
-                # Retrieve context
-                sources = self._retrieve_context(query_text, top_k)
-
-                if not sources:
-                    yield "I couldn't find relevant information to answer your question."
-                    return
-
-                context = self._format_context(sources)
-
-                # Format user prompt
-                user_prompt = self.user_prompt_template.format(
-                    context=context, question=query_text
-                )
-
-                # Create messages
-                messages = [
-                    {"role": "system", "content": self.system_prompt},
-                    {"role": "user", "content": user_prompt},
-                ]
-
-                # Stream response
-                stream = self.openai_client.chat.completions.create(
-                    model=self.model,
-                    messages=messages,
-                    temperature=self.temperature,
-                    max_tokens=self.max_tokens,
-                    stream=True,
-                )
-
-                full_response = []
-                for chunk in stream:
-                    if chunk.choices[0].delta.content:
-                        content = chunk.choices[0].delta.content
-                        full_response.append(content)
-                        yield content
-
-                # Add to history
-                self._add_to_history("user", query_text)
-                self._add_to_history("assistant", "".join(full_response))
-
-            except Exception as e:
-                logger.error(f"Streaming query failed: {str(e)}", exc_info=True)
-                yield f"Error: {str(e)}"
+        for event in self.query_stream(query_text, top_k):
+            if event.get("type") == "chunk":
+                yield event["content"]
+            elif event.get("type") == "error":
+                yield event["content"]
+                return
+            elif event.get("type") == "sources" and not event.get("content"):
+                yield "I couldn't find relevant information to answer your question."
+                return
 
     def clear_history(self) -> None:
         """Clear conversation history."""
