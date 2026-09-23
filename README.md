@@ -1,58 +1,43 @@
-# 🤖 RAG Chatbot Template
-
-**Production-ready RAG chatbot you can customize in 5 minutes**
+# fifi.ai
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 
-> 💡 **This is a template!** Clone it, add your blogs, customize the branding, and deploy your own AI chatbot.
+This started as a weekend idea: let anyone who writes turn their content into a grounded Q&A assistant backed by their own material. I made the first version public so others could use it as a starting point. It was built with Claude Code, with me making the architecture and design decisions throughout. Key choices were modular components, swappable vector stores (FAISS for local use, Pinecone for cloud), structured JSON logging, and a full test suite from the start.
 
 ---
 
-## ✨ Features
+## Features
 
-- 🚀 **5-Minute Setup** - Clone → Configure → Deploy
-- 🎨 **Easy Branding** - Customize name, colors, messages via `.env`
-- 🎯 **Customizable Prompts** - Edit AI personality via YAML files (no code!)
-- 📝 **Just Add Content** - Drop `.md` files in `blogs/` folder
-- 🤖 **Production RAG** - FAISS or Pinecone vector search + OpenAI embeddings
-- 💬 **Dual Interface** - Streamlit web UI + CLI chatbot
-- 🌓 **Dark Mode** - Toggle between light and dark themes
-- ⚡ **Streaming Responses** - ChatGPT-style word-by-word generation
-- 📱 **Mobile Responsive** - Works beautifully on all devices
-- 🔒 **Security Built-In** - API key sanitization, input validation
-- 📊 **Observability** - Structured logging, metrics tracking
-- ✅ **127 Tests Included** - Production-ready code quality
-- 📱 **Deploy Anywhere** - Streamlit Cloud (free), Docker, Vercel
+- Drop `.md` files in `blogs/` and they become the knowledge base
+- FAISS (local) or Pinecone (cloud) vector search with OpenAI embeddings
+- Streamlit web UI with dark mode and streaming responses
+- CLI chatbot for terminal use
+- Customizable AI personality via YAML prompt files
+- Structured JSON logging and query metrics
+- 127 tests
 
 ---
 
-## 📖 Documentation
+## Documentation
 
-### User Guides
 - **[CUSTOMIZATION.md](docs/CUSTOMIZATION.md)** - Branding and customization
 - **[BLOG_FORMAT.md](docs/BLOG_FORMAT.md)** - Blog writing guide
 - **[DEPLOYMENT.md](docs/DEPLOYMENT.md)** - Deploy to production
 - **[prompts/README.md](prompts/README.md)** - AI prompt customization
-
-### Features & Testing
-- **[FRONTEND.md](docs/FRONTEND.md)** - Dark mode, streaming, mobile features
-- **[TEST_SUMMARY.md](docs/TEST_SUMMARY.md)** - Test results and coverage
-
-### Developer Guides
+- **[FRONTEND.md](docs/FRONTEND.md)** - UI features
 - **[ROADMAP.md](docs/ROADMAP.md)** - Project phases and timeline
-- **[CLAUDE.md](docs/CLAUDE.md)** - Development standards
 
 ---
 
-## 🏗️ Architecture
+## Architecture
 
 ```
 ┌─────────────┐     ┌──────────────┐     ┌─────────────┐
 │  Blog Posts │────▶│   Embedding  │────▶│   Vector    │
 │  (Markdown) │     │   Generator  │     │  Database   │
-└─────────────┘     └──────────────┘     │   (FAISS)   │
+└─────────────┘     └──────────────┘     │(FAISS/Pine) │
                                           └──────┬──────┘
                                                  │
                     ┌────────────────────────────┘
@@ -72,7 +57,7 @@
 
 ---
 
-## 🚀 Quick Start
+## Quick Start
 
 ### Prerequisites
 
@@ -84,7 +69,7 @@
 
 1. **Clone the repository**
    ```bash
-   git clone https://github.com/yourusername/fifi.ai.git
+   git clone https://github.com/fehernandespaysan/fifi.ai.git
    cd fifi.ai
    ```
 
@@ -110,174 +95,77 @@
    python examples/verify_setup.py
    ```
 
-### Using Fifi.ai
+### Usage
 
-#### Option 1: Web Interface (Streamlit) ⭐ Recommended
-
-The easiest way to use Fifi.ai is through the beautiful web interface:
+#### Web Interface (Streamlit)
 
 ```bash
-# Run the Streamlit web app
 streamlit run streamlit_app.py
-
-# Or use the launcher script
-./run_web.sh
 ```
 
-Then open your browser to `http://localhost:8501`
+Open `http://localhost:8501`. Includes dark mode, streaming responses, source citations, and a stats dashboard.
 
-**Features:**
-- 💬 Beautiful chat interface
-- 🌓 Dark mode with theme switcher
-- ⚡ Streaming responses (ChatGPT-style)
-- 📱 Mobile responsive design
-- 📊 Real-time statistics dashboard
-- 📚 Source citations with expandable details
-- 🎨 Markdown rendering
-- 🔄 Conversation management
-
-#### Option 2: Command Line Interface (CLI)
-
-For terminal lovers, use the CLI chatbot:
+#### Command Line Interface
 
 ```bash
-# Start the CLI chatbot
 python chat.py
 
-# Available commands:
+# Commands:
 # /help     - Show help
 # /stats    - View statistics
 # /history  - Show conversation
 # /clear    - Clear history
-# /exit     - Exit chatbot
+# /exit     - Exit
 ```
 
-#### Option 3: Example Scripts
-
-Run individual example scripts to explore functionality:
+#### Example Scripts
 
 ```bash
-# Verify your setup
-python examples/verify_setup.py
-
-# Load and inspect blog posts
+python examples/verify_setup.py          # Verify your setup
 python examples/load_and_inspect_blogs.py
-
-# Generate embeddings from blog posts
 python examples/generate_embeddings.py
-
-# Test the complete RAG pipeline
 python examples/interactive_rag_demo.py
 ```
 
 ---
 
-## 🛠️ Technology Stack
+## Technology Stack
 
-### Core Technologies
 - **Language:** Python 3.11+
 - **LLM Provider:** OpenAI (GPT-4o-mini / GPT-4o)
 - **Vector Database:** FAISS (local) or Pinecone (cloud)
 - **Framework:** LangChain
-- **Web API:** FastAPI
 - **UI:** Streamlit
-
-### Testing & Quality
 - **Testing:** pytest, pytest-cov
-- **Linting:** black, pylint, mypy
-- **Security:** bandit
+- **Linting:** black, pylint, mypy, bandit
 
 ---
 
-## 📊 Project Status
-
-**Current Phase:** ✅ Core Platform Complete - Content Creation & Deployment Prep
+## Project Status
 
 | Phase | Status | Description |
 |-------|--------|-------------|
-| **Phase 0** | ✅ Complete | Project structure, configuration, logging |
-| **Phase 1** | ✅ Complete | Blog data handling and vector embeddings |
-| **Phase 2** | ✅ Complete | RAG query engine |
-| **Phase 3** | ✅ Complete | CLI chatbot |
-| **Phase 4** | ✅ Complete | Testing & quality assurance (127 tests, 94.5% passing) |
-| Phase 5 | ⏸️ Deferred | FastAPI backend (will build if needed) |
-| **Phase 6** | ✅ Complete | Streamlit UI (production-ready) |
-| Phase 7+ | 📅 Planned | Avatar, insights, and advanced features |
+| Phase 0 | Complete | Project structure, configuration, logging |
+| Phase 1 | Complete | Blog data handling and vector embeddings |
+| Phase 2 | Complete | RAG query engine |
+| Phase 3 | Complete | CLI chatbot |
+| Phase 4 | Complete | Testing and quality assurance |
+| Phase 5 | Deferred | FastAPI backend |
+| Phase 6 | Complete | Streamlit UI |
+| Phase 7+ | Planned | Advanced features |
 
-**Test Results:** 120/127 tests passing, ~75% code coverage
-**Next Steps:** Creating real blog content, then deploying to Streamlit Cloud
-
-See [ROADMAP.md](docs/ROADMAP.md) for detailed timeline and [docs/TEST_SUMMARY.md](docs/TEST_SUMMARY.md) for test details.
+**Test Results:** 111/127 tests passing
 
 ---
 
-## 💡 Use Cases
+## License
 
-- **Personal Knowledge Base** - Query your blog posts and notes through an AI interface
-- **Learning Platform** - Understand how production RAG systems work
-- **Documentation Assistant** - Build a chatbot for your documentation
-- **Content Discovery** - Help readers find relevant content from your blog
-- **Portfolio Project** - Demonstrate AI engineering skills
+MIT — see [LICENSE](LICENSE).
 
 ---
 
-## 🤝 Contributing
-
-We welcome contributions! This project is designed for learning, so feel free to:
-
-- 🐛 Report bugs
-- 💡 Suggest features
-- 📝 Improve documentation
-- 🔧 Submit pull requests
-
-See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines (coming soon).
-
----
-
-## 📈 Roadmap Highlights
-
-### Q4 2025
-- ✅ Phase 0: Foundation & Setup
-- 🎯 Phase 1-3: Core RAG functionality
-- 🎯 Phase 4: Testing & QA
-- 🎯 Phase 5-6: Web API & UI
-
-### Q1 2026
-- 🎯 Avatar implementation
-- 🎯 Advanced features
-- 🎯 Community growth
-
-See [ROADMAP.md](docs/ROADMAP.md) for complete details.
-
----
-
-## 📝 License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
----
-
-## 🙏 Acknowledgments
+## Acknowledgments
 
 - Built with [LangChain](https://www.langchain.com/)
 - Powered by [OpenAI](https://openai.com/)
-- Vector search with [FAISS](https://github.com/facebookresearch/faiss)
-- Inspired by the open-source AI community
-
----
-
-## 📞 Support & Questions
-
-- 📧 **Email:** fernanda@example.com
-- 🐛 **Issues:** [GitHub Issues](https://github.com/yourusername/fifi.ai/issues)
-- 💬 **Discussions:** [GitHub Discussions](https://github.com/yourusername/fifi.ai/discussions)
-
----
-
-## ⭐ Star History
-
-If you find this project useful, please consider giving it a star! It helps others discover the project.
-
----
-
-**Built with ❤️ for the AI Engineering community**
+- Vector search with [FAISS](https://github.com/facebookresearch/faiss) and [Pinecone](https://www.pinecone.io/)
