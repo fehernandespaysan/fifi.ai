@@ -103,8 +103,6 @@ class SetupValidator:
             "faiss",
             "pydantic",
             "pydantic_settings",
-            "fastapi",
-            "uvicorn",
             "pytest",
         ]
 

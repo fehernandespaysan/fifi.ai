@@ -299,30 +299,6 @@ class Config(BaseSettings):
     )
 
     # =============================================================================
-    # Hybrid Search Configuration
-    # =============================================================================
-    hybrid_search_enabled: bool = Field(
-        default=False,
-        description="Enable hybrid (vector + keyword) search"
-    )
-    hybrid_vector_weight: float = Field(
-        default=0.7,
-        ge=0.0,
-        le=1.0,
-        description="Weight for vector similarity in hybrid search"
-    )
-    hybrid_keyword_weight: float = Field(
-        default=0.3,
-        ge=0.0,
-        le=1.0,
-        description="Weight for keyword/BM25 search in hybrid search"
-    )
-    bm25_index_path: Path = Field(
-        default=Path("data/bm25_index.pkl"),
-        description="Path to BM25 index file"
-    )
-
-    # =============================================================================
     # Performance & Caching
     # =============================================================================
     cache_enabled: bool = Field(
