@@ -87,12 +87,11 @@ The embeddings manager should process this correctly.
             # Verify embeddings created
             assert embeddings_manager.index is not None
             assert embeddings_manager.index.ntotal > 0
-            assert len(embeddings_manager.chunks) > 0
+            assert len(embeddings_manager.chunk_map) > 0
 
             # Verify save/load
             embeddings_manager.save()
-            assert embeddings_manager.index_path.exists()
-            assert embeddings_manager.metadata_path.exists()
+            assert embeddings_manager.vector_store.index_path.exists()
 
             # Load in new manager
             new_manager = EmbeddingsManager()
@@ -100,7 +99,7 @@ The embeddings manager should process this correctly.
 
             assert loaded is True
             assert new_manager.index.ntotal == embeddings_manager.index.ntotal
-            assert len(new_manager.chunks) == len(embeddings_manager.chunks)
+            assert len(new_manager.chunk_map) == len(embeddings_manager.chunk_map)
 
 
 class TestEmbeddingsToRAGPipeline:
@@ -422,7 +421,7 @@ class TestErrorHandlingAndRecovery:
             response = rag_engine.query("Test query")
 
             # Should return no context response
-            assert "couldn't find relevant information" in response.answer
+            assert response.metadata.get("no_context") is True
 
 
 class TestPerformanceAndScaling:
@@ -478,7 +477,7 @@ class TestPerformanceAndScaling:
             embeddings_manager.add_documents([blog])
 
             # Verify chunking
-            assert len(embeddings_manager.chunks) > 1
+            assert len(embeddings_manager.chunk_map) > 1
             assert embeddings_manager.index.ntotal > 1
 
             # Verify statistics

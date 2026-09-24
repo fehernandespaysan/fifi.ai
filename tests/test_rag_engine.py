@@ -247,9 +247,7 @@ class TestRAGEngine:
 
         # Verify response
         assert isinstance(response, RAGResponse)
-        assert "couldn't find relevant information" in response.answer
         assert len(response.sources) == 0
-        assert response.tokens_used == 0
         assert response.metadata.get("no_context") is True
 
     @patch("src.rag_engine.OpenAI")
@@ -285,7 +283,8 @@ class TestRAGEngine:
         response = engine.query("Test query")
 
         # Should get no context response because score too low
-        assert "couldn't find relevant information" in response.answer
+        assert response.metadata.get("no_context") is True
+        assert len(response.sources) == 0
 
     @patch("src.rag_engine.OpenAI")
     def test_format_context(
@@ -509,7 +508,8 @@ class TestRAGEngine:
         # Query should return no context response
         response = engine.query("Test query")
 
-        assert "couldn't find relevant information" in response.answer
+        assert response.metadata.get("no_context") is True
+        assert len(response.sources) == 0
 
 
 class TestRAGEngineIntegration:

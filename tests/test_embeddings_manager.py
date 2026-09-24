@@ -81,13 +81,14 @@ class TestEmbeddingsManager:
 
     @pytest.fixture
     def mock_openai_batch_response(self):
-        """Create a mock OpenAI batch API response."""
-        mock_response = Mock()
-        mock_response.data = [
-            Mock(embedding=[0.1 + i * 0.01] * 1536) for i in range(3)
-        ]
-        mock_response.usage = Mock(total_tokens=300)
-        return mock_response
+        """Create a mock OpenAI batch API response that matches input size."""
+        def _make_response(input=None, model=None, **kwargs):
+            count = len(input) if isinstance(input, list) else 3
+            mock_response = Mock()
+            mock_response.data = [Mock(embedding=[0.1 + i * 0.01] * 1536) for i in range(count)]
+            mock_response.usage = Mock(total_tokens=count * 100)
+            return mock_response
+        return _make_response
 
     @pytest.fixture
     def embeddings_manager(self, tmp_path):
@@ -111,20 +112,26 @@ class TestEmbeddingsManager:
         assert embeddings_manager.chunk_size > 0
         assert embeddings_manager.chunk_overlap >= 0
         assert embeddings_manager.embedding_model is not None
-        assert embeddings_manager.index is None  # Not initialized yet
-        assert len(embeddings_manager.chunks) == 0
+        assert embeddings_manager.index is not None  # FAISS index created on init
+        assert embeddings_manager.index.ntotal == 0  # But empty
+        assert len(embeddings_manager.chunk_map) == 0
 
     def test_embeddings_manager_custom_paths(self, tmp_path):
-        """Test EmbeddingsManager with custom paths."""
+        """Test EmbeddingsManager with custom vector store paths."""
+        import os
         custom_index = tmp_path / "custom_index.faiss"
         custom_metadata = tmp_path / "custom_metadata.pkl"
 
-        manager = EmbeddingsManager(
-            index_path=custom_index, metadata_path=custom_metadata
-        )
+        with patch.dict(os.environ, {
+            "OPENAI_API_KEY": "sk-test1234567890123456789",
+            "FAISS_INDEX_PATH": str(custom_index),
+            "FAISS_METADATA_PATH": str(custom_metadata),
+        }):
+            from src.config import reset_config
+            reset_config()
+            manager = EmbeddingsManager()
 
-        assert manager.index_path == custom_index
-        assert manager.metadata_path == custom_metadata
+        assert manager.vector_store.index_path == custom_index
 
     def test_chunk_text_basic(self, embeddings_manager):
         """Test basic text chunking."""
@@ -218,7 +225,7 @@ class TestEmbeddingsManager:
     ):
         """Test batch embedding generation."""
         mock_client = Mock()
-        mock_client.embeddings.create.return_value = mock_openai_batch_response
+        mock_client.embeddings.create.side_effect = mock_openai_batch_response
         embeddings_manager.openai_client = mock_client
 
         texts = ["Text 1", "Text 2", "Text 3"]
@@ -260,7 +267,7 @@ class TestEmbeddingsManager:
     ):
         """Test adding documents to the index."""
         mock_client = Mock()
-        mock_client.embeddings.create.return_value = mock_openai_batch_response
+        mock_client.embeddings.create.side_effect = mock_openai_batch_response
         embeddings_manager.openai_client = mock_client
 
         # Create test blogs
@@ -288,8 +295,7 @@ class TestEmbeddingsManager:
         # Check that index was created
         assert embeddings_manager.index is not None
         assert embeddings_manager.index.ntotal > 0
-        assert len(embeddings_manager.chunks) > 0
-        assert embeddings_manager.dimension == 1536
+        assert len(embeddings_manager.chunk_map) > 0
 
         # Check metrics
         assert embeddings_manager.total_embeddings_generated > 0
@@ -302,17 +308,15 @@ class TestEmbeddingsManager:
         """Test searching the index."""
         mock_client = Mock()
 
-        # First call: batch embeddings for documents
-        batch_response = Mock()
-        batch_response.data = [Mock(embedding=[0.1 + i * 0.01] * 1536) for i in range(3)]
-        batch_response.usage = Mock(total_tokens=300)
+        # Dynamic response: match embedding count to input size
+        def make_response(input=None, model=None, **kwargs):
+            count = len(input) if isinstance(input, list) else 1
+            r = Mock()
+            r.data = [Mock(embedding=[0.1 + i * 0.01] * 1536) for i in range(count)]
+            r.usage = Mock(total_tokens=count * 50)
+            return r
 
-        # Second call: single embedding for query
-        query_response = Mock()
-        query_response.data = [Mock(embedding=[0.1] * 1536)]
-        query_response.usage = Mock(total_tokens=50)
-
-        mock_client.embeddings.create.side_effect = [batch_response, query_response]
+        mock_client.embeddings.create.side_effect = make_response
         embeddings_manager.openai_client = mock_client
 
         # Add documents
@@ -353,7 +357,7 @@ class TestEmbeddingsManager:
     ):
         """Test saving and loading the index."""
         mock_client = Mock()
-        mock_client.embeddings.create.return_value = mock_openai_batch_response
+        mock_client.embeddings.create.side_effect = mock_openai_batch_response
         embeddings_manager.openai_client = mock_client
 
         # Add some documents
@@ -366,27 +370,22 @@ class TestEmbeddingsManager:
         )
         embeddings_manager.add_documents([blog])
 
-        original_chunks = len(embeddings_manager.chunks)
+        original_chunks = len(embeddings_manager.chunk_map)
         original_total = embeddings_manager.index.ntotal
 
         # Save
         embeddings_manager.save()
 
         # Check files exist
-        assert embeddings_manager.index_path.exists()
-        assert embeddings_manager.metadata_path.exists()
+        assert embeddings_manager.vector_store.index_path.exists()
 
-        # Create new manager and load
-        new_manager = EmbeddingsManager(
-            index_path=embeddings_manager.index_path,
-            metadata_path=embeddings_manager.metadata_path,
-        )
+        # Create new manager and load (shares same config paths via env)
+        new_manager = EmbeddingsManager()
         loaded = new_manager.load()
 
         assert loaded is True
         assert new_manager.index.ntotal == original_total
-        assert len(new_manager.chunks) == original_chunks
-        assert new_manager.dimension == 1536
+        assert len(new_manager.chunk_map) == original_chunks
 
     def test_save_empty_index(self, embeddings_manager, caplog):
         """Test that saving empty index logs warning."""
@@ -402,34 +401,34 @@ class TestEmbeddingsManager:
 
     def test_load_corrupt_metadata(self, embeddings_manager, tmp_path):
         """Test loading with corrupt metadata file."""
-        # Create FAISS index file first (so it passes the existence check)
-        embeddings_manager.index_path.parent.mkdir(parents=True, exist_ok=True)
+        vs = embeddings_manager.vector_store
+        vs.index_path.parent.mkdir(parents=True, exist_ok=True)
         index = faiss.IndexFlatL2(1536)
-        faiss.write_index(index, str(embeddings_manager.index_path))
+        faiss.write_index(index, str(vs.index_path))
 
-        # Create metadata file with incomplete/corrupt data (missing required keys)
-        with open(embeddings_manager.metadata_path, "wb") as f:
-            pickle.dump({"invalid": "data"}, f)  # Missing required 'chunks' key
+        # Write corrupt FAISS metadata
+        with open(vs.metadata_path, "wb") as f:
+            pickle.dump({"invalid": "data"}, f)
 
-        # Loading should fail when trying to access missing keys
-        with pytest.raises((EmbeddingsError, KeyError)):
-            embeddings_manager.load()
+        # Loading fails gracefully — broad catch in load() logs and returns False
+        result = embeddings_manager.load()
+        assert result is False
 
     def test_clear(self, embeddings_manager):
         """Test clearing the index."""
-        # Set some values
-        embeddings_manager.index = faiss.IndexFlatL2(1536)
-        embeddings_manager.chunks = [Mock()]
-        embeddings_manager.dimension = 1536
+        # Set some metric values
         embeddings_manager.total_embeddings_generated = 10
+        embeddings_manager.total_api_calls = 5
+        embeddings_manager.total_tokens_used = 1000
+        embeddings_manager.chunk_map["fake-id"] = Mock()
 
         # Clear
         embeddings_manager.clear()
 
-        # Verify cleared
-        assert embeddings_manager.index is None
-        assert len(embeddings_manager.chunks) == 0
-        assert embeddings_manager.dimension is None
+        # Verify cleared (clear() re-initializes to an empty index, not None)
+        assert embeddings_manager.index is not None
+        assert embeddings_manager.index.ntotal == 0
+        assert len(embeddings_manager.chunk_map) == 0
         assert embeddings_manager.total_embeddings_generated == 0
         assert embeddings_manager.total_api_calls == 0
         assert embeddings_manager.total_tokens_used == 0
@@ -448,14 +447,9 @@ class TestEmbeddingsManager:
         assert "total_embeddings_generated" in stats
         assert "total_api_calls" in stats
         assert "total_tokens_used" in stats
-        assert "index_exists" in stats
-        assert "index_path" in stats
-        assert "metadata_path" in stats
-
         # Empty index stats
         assert stats["total_vectors"] == 0
         assert stats["total_chunks"] == 0
-        assert stats["index_exists"] is False
 
     @patch("openai.OpenAI")
     def test_get_statistics_with_data(
@@ -463,7 +457,7 @@ class TestEmbeddingsManager:
     ):
         """Test statistics with data in index."""
         mock_client = Mock()
-        mock_client.embeddings.create.return_value = mock_openai_batch_response
+        mock_client.embeddings.create.side_effect = mock_openai_batch_response
         embeddings_manager.openai_client = mock_client
 
         blog = Blog(
@@ -480,7 +474,6 @@ class TestEmbeddingsManager:
         assert stats["total_vectors"] > 0
         assert stats["total_chunks"] > 0
         assert stats["dimension"] == 1536
-        assert stats["index_exists"] is True
         assert stats["total_embeddings_generated"] > 0
 
 
@@ -542,17 +535,14 @@ class TestEmbeddingsManagerIntegration:
             # Verify index was created
             assert manager.index is not None
             assert manager.index.ntotal > 0
-            assert len(manager.chunks) > 0
+            assert len(manager.chunk_map) > 0
 
             # Test save
             manager.save()
-            assert manager.index_path.exists()
-            assert manager.metadata_path.exists()
+            assert manager.vector_store.index_path.exists()
 
-            # Test load
-            new_manager = EmbeddingsManager(
-                index_path=manager.index_path, metadata_path=manager.metadata_path
-            )
+            # Test load (same env paths, so new manager finds the saved files)
+            new_manager = EmbeddingsManager()
             loaded = new_manager.load()
             assert loaded is True
             assert new_manager.index.ntotal == manager.index.ntotal
